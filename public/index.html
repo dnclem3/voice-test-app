@@ -2,115 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Chef Mode – Voice Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chef Mode – Voice Cooking Assistant</title>
 </head>
 <body>
   <h1>👨‍🍳 Chef Mode</h1>
-  <p id="status">Click "Start" and speak your command.</p>
+  <p id="status">Click "Start" and speak to the chef.</p>
   <button id="start-btn">🎙️ Start Listening</button>
 
   <script>
-    const systemPrompt = `
-You are Chef Mode, a helpful cooking assistant guiding a user through a recipe. Be concise, kind, and adaptive to their questions. Your goal is to help them finish the recipe using only voice.
-
-3 tablespoons Vietnamese ground coffee
-(we used Trung Nguyen brand)
-▢ 1-3 tablespoons sweetened condensed milk (depending on your preference; we used Longevity brand)
-▢ 6-8 ounces water that is close to boiling point (depending on your desired coffee strength)
-INSTRUCTIONS
-
-We used the Trung Nguyen brand of ground coffee for this Vietnamese coffee recipe, but you can use any good French roast coffee, too.
-Our Phin Vietnamese coffee filters are the 6-ounce size, but they come in different sizes depending upon your brewing needs. Alternatively, you can use a French coffee press or your favorite drip coffee method.
-Measure 3 tablespoons of ground coffee, and distribute it evenly into the filter.
-DO NOT shake the filters or compress the coffee, or the coffee grounds will drop into the holes of the coffee filter and plug up the holes! The result will be that the coffee takes forever to drip, or the grounds may clog the filter entirely. Place the metal filter gently on top of the coffee.
-Pour your desired amount of condensed milk into a mug or heatproof glass.
-Measure out 6 ounces of near boiling water. Use 8 ounces if you don’t like your coffee with such a strong kick in the pants.
-With the filter placed over the glass, pour two tablespoons of hot water into the filter and wait for 5 seconds to "bloom" the coffee. The bloom is the part of the coffee brewing process when the water releases CO2 from the coffee, and the grounds expand.
-Next, press on the filter gently to compress the bloomed coffee. This helps slow down the drip rate when you use all of your water, and also makes for a more flavorful coffee.
-
-With these steps, you’ll be able to achieve the optimum brewing time. That said, now slowly pour the rest of the water into the filter, and the coffee will begin dripping into your cup or glass.
-Wait about 5 minutes for the coffee to finish drip brewing!
-Remove the filter, and stir to mix in the condensed milk.
-`;
-
-    // Speech recognition
+    // Initialize speech recognition
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.continuous = true;
 
+    // Start button handler
     document.getElementById("start-btn").onclick = () => {
       document.getElementById("status").innerText = "Listening...";
       recognition.start();
     };
 
+    // When user speaks
     recognition.onresult = async (event) => {
-        const userInput = event.results[0][0].transcript;
-        document.getElementById("status").innerText = `You said: "${userInput}"`;
+      const userInput = event.results[0][0].transcript;
+      document.getElementById("status").innerText = `You said: "${userInput}"`;
 
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userMessage: userInput })
-        });
-
-        const data = await response.json();
-        const reply = data.reply;
-
-        
-        speak(reply);
-    };
-
-
-    
-recognition.onend = () => {
-  // Automatically restart listening after speech ends
-  recognition.start();
-};
-
-    recognition.onerror = (e) => {
-      console.error("Speech error", e);
-      document.getElementById("status").innerText = "Error during recognition.";
-    };
-
-    // Text-to-speech
-    function speak(text) {
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = "en-US";
-
-        // Stop listening while speaking
-        recognition.stop();
-
-        utter.onend = () => {
-            recognition.start(); // Resume listening after speech ends
-        };
-
-        window.speechSynthesis.speak(utter);
-        document.getElementById("status").innerText = `👨‍🍳 Chef: ${text}`;
-    }
-
-    // OpenAI fetch
-    async function getAIResponse(userText) {
-      const messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText }
-      ];
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      // Call secure backend function
+      const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o", // or "gpt-3.5-turbo"
-          messages: messages,
-          temperature: 0.6
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userMessage: userInput })
       });
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || "Sorry, I didn’t catch that.";
+      const reply = data.reply;
+
+      speak(reply);
+    };
+
+    // Restart listening when speech ends
+    recognition.onend = () => {
+      recognition.start();
+    };
+
+    // Handle recognition errors
+    recognition.onerror = (e) => {
+      console.error("Speech recognition error", e);
+      document.getElementById("status").innerText = "Error during recognition.";
+    };
+
+    // Text-to-speech function
+    function speak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "en-US";
+
+      recognition.stop(); // Pause mic during speech
+
+      utter.onend = () => {
+        recognition.start(); // Resume mic
+      };
+
+      window.speechSynthesis.speak(utter);
+      document.getElementById("status").innerText = `👨‍🍳 Chef: ${text}`;
     }
   </script>
 </body>
