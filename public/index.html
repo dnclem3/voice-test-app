@@ -33,32 +33,49 @@
         });
 
         const audioBlob = await response.blob();
+        console.log("Blob: ", audioBlob);
+
+        if (audioBlob.size === 0) {
+          document.getElementById("status").innerText = "⚠️ Empty audio response.";
+          return;
+        }
+
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
-        audio.play();
-
-        document.getElementById("status").innerText = `👨‍🍳 Chef is speaking...`;
-
-        // Stop recognition while audio is playing
-        recognition.stop();
 
         audio.onended = () => {
+          document.getElementById("status").innerText = "Chef finished speaking.";
           recognition.start();
         };
+
+        audio.onerror = (e) => {
+          console.error("Audio error:", e);
+          document.getElementById("status").innerText = "❌ Audio playback error.";
+        };
+
+        try {
+          await audio.play();
+          document.getElementById("status").innerText = `👨\u200d🍳 Chef is speaking...`;
+          recognition.stop();
+        } catch (err) {
+          console.warn("Audio play blocked:", err);
+          document.getElementById("status").innerText = "🔇 Audio play blocked by browser.";
+        }
       } catch (err) {
-        console.error("Error handling response:", err);
-        document.getElementById("status").innerText = "Something went wrong.";
+        console.error("Fetch error:", err);
+        document.getElementById("status").innerText = "Error communicating with Chef.";
       }
     };
 
     recognition.onend = () => {
-      // Prevent recognition from stopping unexpectedly
-      recognition.start();
+      if (!window.speechSynthesis.speaking) {
+        recognition.start();
+      }
     };
 
     recognition.onerror = (e) => {
-      console.error("Speech recognition error", e);
-      document.getElementById("status").innerText = "Error during recognition.";
+      console.error("Recognition error:", e);
+      document.getElementById("status").innerText = "Microphone error. Try again.";
     };
   </script>
 </body>
