@@ -11,61 +11,55 @@
   <button id="start-btn">🎙️ Start Listening</button>
 
   <script>
-    // Initialize speech recognition
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.continuous = true;
 
-    // Start button handler
     document.getElementById("start-btn").onclick = () => {
       document.getElementById("status").innerText = "Listening...";
       recognition.start();
     };
 
-    // When user speaks
     recognition.onresult = async (event) => {
       const userInput = event.results[0][0].transcript;
       document.getElementById("status").innerText = `You said: "${userInput}"`;
 
-      // Call secure backend function
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userMessage: userInput })
-      });
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userMessage: userInput })
+        });
 
-      const data = await response.json();
-      const reply = data.reply;
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.play();
 
-      speak(reply);
+        document.getElementById("status").innerText = `👨‍🍳 Chef is speaking...`;
+
+        // Stop recognition while audio is playing
+        recognition.stop();
+
+        audio.onended = () => {
+          recognition.start();
+        };
+      } catch (err) {
+        console.error("Error handling response:", err);
+        document.getElementById("status").innerText = "Something went wrong.";
+      }
     };
 
-    // Restart listening when speech ends
     recognition.onend = () => {
+      // Prevent recognition from stopping unexpectedly
       recognition.start();
     };
 
-    // Handle recognition errors
     recognition.onerror = (e) => {
       console.error("Speech recognition error", e);
       document.getElementById("status").innerText = "Error during recognition.";
     };
-
-    // Text-to-speech function
-    function speak(text) {
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = "en-US";
-
-      recognition.stop(); // Pause mic during speech
-
-      utter.onend = () => {
-        recognition.start(); // Resume mic
-      };
-
-      window.speechSynthesis.speak(utter);
-      document.getElementById("status").innerText = `👨‍🍳 Chef: ${text}`;
-    }
   </script>
 </body>
 </html>

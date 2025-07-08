@@ -33,14 +33,14 @@ Instructions:
 Always wait for the user’s confirmation before moving to the next step. If the user has a question or needs clarification, help them before continuing.
 `;
   
-
 const messages = [
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage }
   ];
 
-  try {
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+try {
+    // Get GPT-4o response
+    const gptRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -53,18 +53,40 @@ const messages = [
       })
     });
 
-    const data = await openaiRes.json();
+    const gptData = await gptRes.json();
 
-    if (data.error) {
-      console.error("OpenAI error:", data.error);
-      return res.status(500).json({ reply: "Sorry, the chef is having trouble. Try again later." });
+    if (!gptData.choices || !gptData.choices[0]) {
+      throw new Error("No response from GPT");
     }
 
-    const reply = data.choices?.[0]?.message?.content || "I didn’t catch that. Want to try again?";
-    res.status(200).json({ reply });
+    const replyText = gptData.choices[0].message.content;
+
+    // Get TTS audio
+    const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "tts-1",
+        voice: "shimmer", // Change this to "nova", "fable", etc.
+        input: replyText
+      })
+    });
+
+    if (!ttsRes.ok) {
+      throw new Error("TTS request failed");
+    }
+
+    // Stream audio back to client
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Disposition", "inline; filename=\"reply.mp3\"");
+    const audioBuffer = await ttsRes.arrayBuffer();
+    res.status(200).send(Buffer.from(audioBuffer));
 
   } catch (err) {
-    console.error("API call failed:", err);
-    res.status(500).json({ reply: "There was an error talking to the chef. Please try again." });
+    console.error("Error in chat API:", err);
+    res.status(500).json({ error: "Chef ran into a problem." });
   }
 }
